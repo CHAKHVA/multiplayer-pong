@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import DisconnectOverlay from "../components/DisconnectOverlay";
 import { useSocket } from "../hooks/useSocket";
 import { useGameStatus, useGameStore } from "../store/gameStore";
 import type { RoomJoinedData } from "../types";
@@ -7,7 +8,7 @@ import type { RoomJoinedData } from "../types";
 const Waiting = () => {
   const navigate = useNavigate();
   const { getSocket } = useSocket();
-  const { joinRoom, setStatus } = useGameStore();
+  const { joinRoom, handleDisconnect, setStatus } = useGameStore();
   const status = useGameStatus();
   const listenersSetRef = useRef(false);
 
@@ -48,9 +49,8 @@ const Waiting = () => {
     };
 
     const handlePlayerDisconnected = () => {
-      alert("Other player disconnected. Returning to main menu.");
-      setStatus("landing");
-      navigate("/");
+      console.log("Opponent disconnected during waiting, updating status.");
+      handleDisconnect();
     };
 
     // Set up event listeners
@@ -70,10 +70,10 @@ const Waiting = () => {
       listenersSetRef.current = false;
       console.log("Waiting page: Socket listeners cleaned up");
     };
-  }, [navigate, getSocket, joinRoom, setStatus, status]);
+  }, [navigate, getSocket, joinRoom, setStatus, status, handleDisconnect]);
 
   if (status !== "waiting") {
-    return null; // Will redirect
+    return <DisconnectOverlay />;
   }
 
   return (

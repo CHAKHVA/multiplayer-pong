@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import DisconnectOverlay from "../components/DisconnectOverlay";
 import GameCanvas from "../components/GameCanvas";
 import GameOverOverlay from "../components/GameOverOverlay"; // Import the overlay
 import { useKeyboardControls } from "../hooks/useKeyboardControls";
@@ -20,7 +21,7 @@ const Game = () => {
   const roomId = useRoomId();
   const status = useGameStatus();
   const gameState = useCurrentGameState();
-  const { setStatus, setGameState, endGame, confirmRestart, reset } =
+  const { setGameState, endGame, confirmRestart, reset, handleDisconnect } =
     useGameStore();
   const listenersSetRef = useRef(false);
 
@@ -51,9 +52,8 @@ const Game = () => {
     const handleGameOver = (data: { winner: "player1" | "player2" }) =>
       endGame(data.winner);
     const handlePlayerDisconnected = () => {
-      alert("Other player disconnected. Game ended.");
-      reset();
-      navigate("/");
+      console.log("Opponent disconnected, updating status.");
+      handleDisconnect(); // Use the store action
     };
     // New listener for restart confirmation
     const handleRestartConfirmed = (initialState: GameState) => {
@@ -81,6 +81,7 @@ const Game = () => {
     endGame,
     confirmRestart,
     reset,
+    handleDisconnect,
   ]);
 
   if (!["playing", "gameOver", "awaitingRestart"].includes(status)) {
@@ -113,10 +114,10 @@ const Game = () => {
         </p>
       </div>
 
-      {/* Use a relative container for the overlay */}
       <div style={{ position: "relative" }}>
         <GameCanvas width={800} height={600} />
         <GameOverOverlay />
+        <DisconnectOverlay />
       </div>
 
       <div

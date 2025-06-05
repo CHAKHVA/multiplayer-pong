@@ -6,7 +6,8 @@ type GameStatus =
   | "waiting"
   | "playing"
   | "gameOver"
-  | "awaitingRestart";
+  | "awaitingRestart"
+  | "opponentDisconnected";
 
 interface GameStore {
   // State
@@ -24,8 +25,9 @@ interface GameStore {
   // Compound actions
   joinRoom: (roomId: string, playerIndex: 1 | 2) => void;
   endGame: (winner: "player1" | "player2") => void;
-  requestRestart: () => void; // New action
+  requestRestart: () => void;
   confirmRestart: (initialState: GameState) => void;
+  handleDisconnect: () => void;
   reset: () => void;
 }
 
@@ -74,6 +76,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
       gameState: initialState,
       status: "playing",
     }),
+
+  handleDisconnect: () => set({ status: "opponentDisconnected" }),
 
   reset: () =>
     set({
