@@ -1,7 +1,12 @@
 import { create } from "zustand";
 import type { GameState } from "../types";
 
-type GameStatus = "landing" | "waiting" | "playing" | "gameOver";
+type GameStatus =
+  | "landing"
+  | "waiting"
+  | "playing"
+  | "gameOver"
+  | "awaitingRestart";
 
 interface GameStore {
   // State
@@ -18,8 +23,9 @@ interface GameStore {
 
   // Compound actions
   joinRoom: (roomId: string, playerIndex: 1 | 2) => void;
-  startGame: (gameState: GameState) => void;
   endGame: (winner: "player1" | "player2") => void;
+  requestRestart: () => void; // New action
+  confirmRestart: (initialState: GameState) => void;
   reset: () => void;
 }
 
@@ -47,12 +53,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
       status: "playing",
     }),
 
-  startGame: (gameState) =>
-    set({
-      gameState,
-      status: "playing",
-    }),
-
   endGame: (winner) =>
     set((state) => ({
       gameState: state.gameState
@@ -64,6 +64,16 @@ export const useGameStore = create<GameStore>((set, get) => ({
         : null,
       status: "gameOver",
     })),
+
+  // New action to handle local player's restart request
+  requestRestart: () => set({ status: "awaitingRestart" }),
+
+  // New action to handle confirmation from server
+  confirmRestart: (initialState) =>
+    set({
+      gameState: initialState,
+      status: "playing",
+    }),
 
   reset: () =>
     set({

@@ -1,7 +1,8 @@
 import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import GameCanvas from "../components/GameCanvas";
-import { useKeyboardControls } from "../hooks/useKeyboardControls"; // Using the hook
+import GameOverOverlay from "../components/GameOverOverlay"; // Import the overlay
+import { useKeyboardControls } from "../hooks/useKeyboardControls";
 import { useSocket } from "../hooks/useSocket";
 import {
   useCurrentGameState,
@@ -19,10 +20,10 @@ const Game = () => {
   const roomId = useRoomId();
   const status = useGameStatus();
   const gameState = useCurrentGameState();
-  const { setStatus, setGameState, endGame, reset } = useGameStore();
+  const { setStatus, setGameState, endGame, confirmRestart, reset } =
+    useGameStore();
   const listenersSetRef = useRef(false);
 
-  // Use the keyboard controls hook
   useKeyboardControls({
     socket: getSocket(),
     playerIndex,
@@ -37,7 +38,8 @@ const Game = () => {
       return;
     }
 
-    if (status !== "playing" && status !== "gameOver") {
+    const validStatuses = ["playing", "gameOver", "awaitingRestart"];
+    if (!validStatuses.includes(status)) {
       navigate("/");
       return;
     }
@@ -45,35 +47,43 @@ const Game = () => {
     if (listenersSetRef.current) return;
     listenersSetRef.current = true;
 
-    // This is the core logic for this prompt
-    const handleGameState = (state: GameState) => {
-      // Update the store with the new state from the server
-      setGameState(state);
-    };
-
-    const handleGameOver = (data: { winner: "player1" | "player2" }) => {
+    const handleGameState = (state: GameState) => setGameState(state);
+    const handleGameOver = (data: { winner: "player1" | "player2" }) =>
       endGame(data.winner);
-    };
-
     const handlePlayerDisconnected = () => {
       alert("Other player disconnected. Game ended.");
       reset();
       navigate("/");
     };
+    // New listener for restart confirmation
+    const handleRestartConfirmed = (initialState: GameState) => {
+      console.log("Restart confirmed by server, new state:", initialState);
+      confirmRestart(initialState);
+    };
 
     socket.on("gameState", handleGameState);
     socket.on("gameOver", handleGameOver);
     socket.on("playerDisconnected", handlePlayerDisconnected);
+    socket.on("restartConfirmed", handleRestartConfirmed); // Add listener
 
     return () => {
       socket.off("gameState", handleGameState);
       socket.off("gameOver", handleGameOver);
       socket.off("playerDisconnected", handlePlayerDisconnected);
+      socket.off("restartConfirmed", handleRestartConfirmed); // Clean up listener
       listenersSetRef.current = false;
     };
-  }, [status, navigate, getSocket, setGameState, endGame, reset]);
+  }, [
+    status,
+    navigate,
+    getSocket,
+    setGameState,
+    endGame,
+    confirmRestart,
+    reset,
+  ]);
 
-  if (status !== "playing" && status !== "gameOver") {
+  if (!["playing", "gameOver", "awaitingRestart"].includes(status)) {
     return null;
   }
 
@@ -103,7 +113,11 @@ const Game = () => {
         </p>
       </div>
 
-      <GameCanvas width={800} height={600} />
+      {/* Use a relative container for the overlay */}
+      <div style={{ position: "relative" }}>
+        <GameCanvas width={800} height={600} />
+        <GameOverOverlay />
+      </div>
 
       <div
         style={{
