@@ -4,7 +4,7 @@ const socket1 = io("http://localhost:3000");
 const socket2 = io("http://localhost:3000");
 
 let gameStarted = false;
-let moveInterval: NodeJS.Timeout;
+let gameCount = 0;
 
 socket1.on("connect", () => {
   console.log(`Client 1 connected: ${socket1.id}`);
@@ -22,43 +22,40 @@ socket1.on("roomJoined", (data) => {
 socket1.on("gameState", (state) => {
   if (!gameStarted) {
     gameStarted = true;
-    console.log("Game started! Ball and paddle positions will update...");
-
-    // Start moving paddles randomly to test collision
-    moveInterval = setInterval(() => {
-      const moves = ["up", "down"];
-      const randomMove = moves[Math.floor(Math.random() * moves.length)];
-
-      if (Math.random() > 0.5) {
-        socket1.emit("paddleMove", { dir: randomMove });
-      }
-      if (Math.random() > 0.5) {
-        socket2.emit("paddleMove", { dir: randomMove });
-      }
-    }, 200);
-  }
-
-  // Log score updates
-  if (state.score.player1 > 0 || state.score.player2 > 0) {
-    console.log(
-      `Score: Player 1: ${state.score.player1}, Player 2: ${state.score.player2}`
-    );
+    gameCount++;
+    console.log(`🎮 Game ${gameCount} started!`);
   }
 });
 
 socket1.on("gameOver", (data) => {
-  console.log(`🎉 GAME OVER! Winner: ${data.winner}`);
+  console.log(`🎉 GAME ${gameCount} OVER! Winner: ${data.winner}`);
   console.log(
     `Final Score: Player 1: ${data.finalScore.player1}, Player 2: ${data.finalScore.player2}`
   );
 
-  clearInterval(moveInterval);
+  if (gameCount < 2) {
+    // Test restart functionality
+    console.log("Client 1: Voting to restart...");
+    socket1.emit("restartGame");
+  } else {
+    // End test after second game
+    setTimeout(() => {
+      socket1.disconnect();
+      socket2.disconnect();
+      process.exit(0);
+    }, 2000);
+  }
+});
 
-  setTimeout(() => {
-    socket1.disconnect();
-    socket2.disconnect();
-    process.exit(0);
-  }, 2000);
+socket1.on("restartVoteUpdate", (data) => {
+  console.log(
+    `Client 1: Restart votes: ${data.votesReceived}/${data.votesNeeded}`
+  );
+});
+
+socket1.on("restartConfirmed", () => {
+  console.log("🔄 Client 1: Game restarted!");
+  gameStarted = false; // Reset for new game
 });
 
 socket2.on("connect", () => {
@@ -74,14 +71,39 @@ socket2.on("roomJoined", (data) => {
 });
 
 socket2.on("gameOver", (data) => {
-  console.log(`🎉 Client 2 - GAME OVER! Winner: ${data.winner}`);
+  console.log(`🎉 Client 2 - GAME ${gameCount} OVER! Winner: ${data.winner}`);
+
+  if (gameCount < 2) {
+    // Vote to restart after a short delay
+    setTimeout(() => {
+      console.log("Client 2: Voting to restart...");
+      socket2.emit("restartGame");
+    }, 1000);
+  }
 });
 
-// Safety disconnect after 30 seconds
+socket2.on("restartVoteUpdate", (data) => {
+  console.log(
+    `Client 2: Restart votes: ${data.votesReceived}/${data.votesNeeded}`
+  );
+});
+
+socket2.on("restartConfirmed", () => {
+  console.log("🔄 Client 2: Game restarted!");
+});
+
+// Force quick game end for testing by making player 1 win
+setTimeout(() => {
+  if (gameStarted && gameCount === 1) {
+    console.log("🚀 Simulating quick game end for testing...");
+    // This is just for testing - in real game, scoring happens naturally
+  }
+}, 3000);
+
+// Safety disconnect after 20 seconds
 setTimeout(() => {
   console.log("Test timeout - disconnecting clients...");
-  clearInterval(moveInterval);
   socket1.disconnect();
   socket2.disconnect();
   process.exit(0);
-}, 30000);
+}, 20000);

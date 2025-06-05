@@ -28,3 +28,7 @@ export interface Player {
 export interface PaddleMoveEvent {
   dir: "up" | "down";
 }
+
+export interface RestartGameEvent {
+  // Empty for now, just the event trigger
+}

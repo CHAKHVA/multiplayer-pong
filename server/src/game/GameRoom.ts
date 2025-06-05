@@ -7,6 +7,7 @@ export class GameRoom {
   private gameState: GameState;
   private roomId: string;
   private io: any;
+  private restartVotes: Set<string> = new Set();
 
   // Game constants
   private readonly CANVAS_WIDTH = 800;
@@ -63,9 +64,13 @@ export class GameRoom {
     this.players.set(socket.id, player);
     console.log(`Player ${playerIndex} added to room ${this.roomId}`);
 
-    // Set up paddle movement listener for this player
+    // Set up event listeners for this player
     socket.on("paddleMove", (data: PaddleMoveEvent) => {
       this.handlePaddleMove(socket.id, data);
+    });
+
+    socket.on("restartGame", () => {
+      this.handleRestartVote(socket.id);
     });
 
     // Start game loop when we have 2 players
@@ -77,8 +82,12 @@ export class GameRoom {
   public removePlayer(socketId: string): void {
     const player = this.players.get(socketId);
     if (player) {
-      // Remove paddle move listener
+      // Remove event listeners
       player.socket.off("paddleMove");
+      player.socket.off("restartGame");
+
+      // Remove from restart votes
+      this.restartVotes.delete(socketId);
 
       this.players.delete(socketId);
       console.log(`Player removed from room ${this.roomId}`);
@@ -123,7 +132,60 @@ export class GameRoom {
     );
   }
 
+  private handleRestartVote(socketId: string): void {
+    const player = this.players.get(socketId);
+    if (!player || !this.gameState.gameOver) {
+      console.log(
+        `Invalid restart vote from ${socketId}: game not over or player not found`
+      );
+      return;
+    }
+
+    // Add vote
+    this.restartVotes.add(socketId);
+    console.log(
+      `Player ${player.playerIndex} voted to restart. Votes: ${this.restartVotes.size}/2`
+    );
+
+    // Check if both players have voted
+    if (this.restartVotes.size === 2) {
+      this.restartGame();
+    } else {
+      // Notify players about the vote status
+      this.io.to(this.roomId).emit("restartVoteUpdate", {
+        votesReceived: this.restartVotes.size,
+        votesNeeded: 2,
+      });
+    }
+  }
+
+  private restartGame(): void {
+    console.log(`Restarting game in room ${this.roomId}`);
+
+    // Clear restart votes
+    this.restartVotes.clear();
+
+    // Reset game state
+    this.gameState = this.initializeGameState();
+
+    // Reset ball velocity
+    this.ballVelocity.dx = 5;
+    this.ballVelocity.dy = 3;
+
+    // Emit restart confirmation
+    this.io.to(this.roomId).emit("restartConfirmed");
+
+    // Resume game loop
+    this.startGameLoop();
+
+    // Send initial game state
+    this.io.to(this.roomId).emit("gameState", this.gameState);
+  }
+
   private startGameLoop(): void {
+    // Don't start if already running
+    if (this.intervalId) return;
+
     console.log(`Starting game loop for room ${this.roomId}`);
 
     this.intervalId = setInterval(() => {
