@@ -16,10 +16,13 @@ socket1.on("roomJoined", (data) => {
   console.log("Client 1: Room joined!", data);
 });
 
+socket1.on("gameState", (state) => {
+  console.log("Client 1 - Ball position:", state.ball);
+});
+
 socket2.on("connect", () => {
   console.log(`Client 2 connected: ${socket2.id}`);
 
-  // Join after a short delay
   setTimeout(() => {
     socket2.emit("joinGame");
   }, 1000);
@@ -27,11 +30,16 @@ socket2.on("connect", () => {
 
 socket2.on("roomJoined", (data) => {
   console.log("Client 2: Room joined!", data);
-
-  // Disconnect both after seeing the pairing
-  setTimeout(() => {
-    socket1.disconnect();
-    socket2.disconnect();
-    process.exit(0);
-  }, 1000);
 });
+
+socket2.on("gameState", (state) => {
+  console.log("Client 2 - Ball position:", state.ball);
+});
+
+// Disconnect after 5 seconds to see the game loop
+setTimeout(() => {
+  console.log("Disconnecting clients...");
+  socket1.disconnect();
+  socket2.disconnect();
+  process.exit(0);
+}, 5000);

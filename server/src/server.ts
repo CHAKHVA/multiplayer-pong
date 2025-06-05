@@ -2,6 +2,7 @@ import cors from "cors";
 import express from "express";
 import { createServer } from "http";
 import { Server } from "socket.io";
+import { GameManager } from "./game/GameManager";
 import WaitingRoom from "./rooms/WaitingRoom";
 
 const app = express();
@@ -29,8 +30,10 @@ const io = new Server(httpServer, {
   },
 });
 
-// Get WaitingRoom singleton
+// Get singletons
 const waitingRoom = WaitingRoom.getInstance();
+const gameManager = GameManager.getInstance();
+gameManager.setIO(io);
 
 // Socket.IO connection handling
 io.on("connection", (socket) => {
@@ -45,17 +48,31 @@ io.on("connection", (socket) => {
       socket.emit("waiting");
       console.log(`Player 1 waiting in room ${result.roomId}`);
     } else {
-      // Second player - game can start
+      // Second player - create game room and start
       const roomId = result.roomId;
+      const gameRoom = gameManager.createRoom(roomId);
+
+      // Get both player sockets
+      const roomSockets = Array.from(
+        io.sockets.adapter.rooms.get(roomId) || []
+      );
+      const player1Socket = io.sockets.sockets.get(roomSockets[0]);
+      const player2Socket = socket;
+
+      // Add players to game room
+      if (player1Socket) {
+        gameRoom.addPlayer(player1Socket, 1);
+      }
+      gameRoom.addPlayer(player2Socket, 2);
 
       // Emit to both players that room is ready
       io.to(roomId).emit("roomJoined", {
         roomId,
-        player1Id: Array.from(io.sockets.adapter.rooms.get(roomId) || [])[0],
+        player1Id: roomSockets[0],
         player2Id: socket.id,
       });
 
-      console.log(`Room ${roomId} created with 2 players`);
+      console.log(`Game room ${roomId} created and started`);
     }
   });
 
@@ -64,6 +81,9 @@ io.on("connection", (socket) => {
 
     // Remove from waiting room if they were waiting
     waitingRoom.removeWaitingPlayer(socket);
+
+    // Handle game room disconnect
+    gameManager.handlePlayerDisconnect(socket);
   });
 });
 
