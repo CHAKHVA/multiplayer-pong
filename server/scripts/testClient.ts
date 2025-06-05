@@ -1,23 +1,37 @@
 import { io } from "socket.io-client";
 
-const socket = io("http://localhost:3000");
+const socket1 = io("http://localhost:3000");
+const socket2 = io("http://localhost:3000");
 
-socket.on("connect", () => {
-  console.log(`Test client connected: ${socket.id}`);
+socket1.on("connect", () => {
+  console.log(`Client 1 connected: ${socket1.id}`);
+  socket1.emit("joinGame");
+});
 
-  // Disconnect after 2 seconds
+socket1.on("waiting", () => {
+  console.log("Client 1: Waiting for opponent...");
+});
+
+socket1.on("roomJoined", (data) => {
+  console.log("Client 1: Room joined!", data);
+});
+
+socket2.on("connect", () => {
+  console.log(`Client 2 connected: ${socket2.id}`);
+
+  // Join after a short delay
   setTimeout(() => {
-    console.log("Test client disconnecting...");
-    socket.disconnect();
+    socket2.emit("joinGame");
+  }, 1000);
+});
+
+socket2.on("roomJoined", (data) => {
+  console.log("Client 2: Room joined!", data);
+
+  // Disconnect both after seeing the pairing
+  setTimeout(() => {
+    socket1.disconnect();
+    socket2.disconnect();
     process.exit(0);
-  }, 2000);
-});
-
-socket.on("disconnect", () => {
-  console.log("Test client disconnected");
-});
-
-socket.on("connect_error", (error) => {
-  console.error("Connection error:", error);
-  process.exit(1);
+  }, 1000);
 });
