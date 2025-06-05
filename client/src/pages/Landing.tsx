@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSocket } from "../hooks/useSocket";
 import { useGameStore } from "../store/gameStore";
@@ -6,13 +7,18 @@ const Landing = () => {
   const navigate = useNavigate();
   const { connect } = useSocket();
   const { setConnected, setWaiting } = useGameStore();
+  const [isConnecting, setIsConnecting] = useState(false);
 
   const handleJoinGame = () => {
+    if (isConnecting) return;
+
+    setIsConnecting(true);
     const socket = connect();
 
-    socket.on("connect", () => {
+    const handleConnect = () => {
       console.log("Connected to server");
       setConnected(true);
+      setIsConnecting(false);
 
       // Join the game
       socket.emit("joinGame");
@@ -20,12 +26,26 @@ const Landing = () => {
 
       // Navigate to waiting screen
       navigate("/waiting");
-    });
+    };
 
-    socket.on("connect_error", (error) => {
+    const handleConnectError = (error: any) => {
       console.error("Connection error:", error);
+      setIsConnecting(false);
       alert("Failed to connect to server. Please try again.");
-    });
+    };
+
+    // Remove any existing listeners first
+    socket.off("connect", handleConnect);
+    socket.off("connect_error", handleConnectError);
+
+    // Add new listeners
+    socket.on("connect", handleConnect);
+    socket.on("connect_error", handleConnectError);
+
+    // If already connected, trigger immediately
+    if (socket.connected) {
+      handleConnect();
+    }
   };
 
   return (
@@ -65,24 +85,29 @@ const Landing = () => {
 
       <button
         onClick={handleJoinGame}
+        disabled={isConnecting}
         style={{
           fontSize: "1.5rem",
           padding: "1rem 2rem",
-          backgroundColor: "#4CAF50",
+          backgroundColor: isConnecting ? "#666" : "#4CAF50",
           color: "white",
           border: "none",
           borderRadius: "8px",
-          cursor: "pointer",
+          cursor: isConnecting ? "not-allowed" : "pointer",
           transition: "background-color 0.3s",
         }}
         onMouseOver={(e) => {
-          e.currentTarget.style.backgroundColor = "#45a049";
+          if (!isConnecting) {
+            e.currentTarget.style.backgroundColor = "#45a049";
+          }
         }}
         onMouseOut={(e) => {
-          e.currentTarget.style.backgroundColor = "#4CAF50";
+          if (!isConnecting) {
+            e.currentTarget.style.backgroundColor = "#4CAF50";
+          }
         }}
       >
-        Join Game
+        {isConnecting ? "Connecting..." : "Join Game"}
       </button>
     </div>
   );

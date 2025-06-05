@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSocket } from "../hooks/useSocket";
 import { useGameStore } from "../store/gameStore";
@@ -8,15 +8,21 @@ const Waiting = () => {
   const navigate = useNavigate();
   const { getSocket } = useSocket();
   const { setRoomData, setWaiting, isWaiting } = useGameStore();
+  const listenersSetRef = useRef(false);
 
   useEffect(() => {
     const socket = getSocket();
 
-    if (!socket) {
+    if (!socket || !socket.connected) {
       // If no socket connection, redirect to landing
+      console.log("No socket connection, redirecting to landing");
       navigate("/");
       return;
     }
+
+    // Prevent duplicate listeners
+    if (listenersSetRef.current) return;
+    listenersSetRef.current = true;
 
     const handleWaiting = () => {
       console.log("Waiting for another player...");
@@ -39,11 +45,17 @@ const Waiting = () => {
     socket.on("roomJoined", handleRoomJoined);
     socket.on("playerDisconnected", handlePlayerDisconnected);
 
+    console.log("Waiting page: Socket listeners set up");
+
     // Cleanup function
     return () => {
-      socket.off("waiting", handleWaiting);
-      socket.off("roomJoined", handleRoomJoined);
-      socket.off("playerDisconnected", handlePlayerDisconnected);
+      if (socket) {
+        socket.off("waiting", handleWaiting);
+        socket.off("roomJoined", handleRoomJoined);
+        socket.off("playerDisconnected", handlePlayerDisconnected);
+      }
+      listenersSetRef.current = false;
+      console.log("Waiting page: Socket listeners cleaned up");
     };
   }, [navigate, getSocket, setRoomData, setWaiting]);
 
