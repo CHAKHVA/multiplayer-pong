@@ -1,4 +1,4 @@
-import { Socket } from "socket.io";
+import { Server, Socket } from "socket.io";
 import { GameState, PaddleMoveEvent, Player } from "./types";
 
 export class GameRoom {
@@ -6,7 +6,7 @@ export class GameRoom {
   private intervalId: NodeJS.Timeout | null = null;
   private gameState: GameState;
   private roomId: string;
-  private io: any;
+  private io: Server;
   private restartVotes: Set<string> = new Set();
 
   // Game constants
@@ -17,7 +17,7 @@ export class GameRoom {
   private readonly PADDLE_HEIGHT = 100;
   private readonly PADDLE_SPEED = 5;
   private readonly PADDLE_MIN_Y = 0;
-  private readonly PADDLE_MAX_Y = this.CANVAS_HEIGHT - this.PADDLE_HEIGHT; // 500
+  private readonly PADDLE_MAX_Y = this.CANVAS_HEIGHT - this.PADDLE_HEIGHT;
   private readonly WINNING_SCORE = 5;
 
   // Ball physics
@@ -26,7 +26,7 @@ export class GameRoom {
     dy: 3,
   };
 
-  constructor(roomId: string, io: any) {
+  constructor(roomId: string, io: Server) {
     this.roomId = roomId;
     this.io = io;
     this.gameState = this.initializeGameState();
