@@ -1,13 +1,14 @@
 import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSocket } from "../hooks/useSocket";
-import { useGameStore } from "../store/gameStore";
+import { useGameStatus, useGameStore } from "../store/gameStore";
 import type { RoomJoinedData } from "../types";
 
 const Waiting = () => {
   const navigate = useNavigate();
   const { getSocket } = useSocket();
-  const { setRoomData, setWaiting, isWaiting } = useGameStore();
+  const { joinRoom, setStatus } = useGameStore();
+  const status = useGameStatus();
   const listenersSetRef = useRef(false);
 
   useEffect(() => {
@@ -16,6 +17,13 @@ const Waiting = () => {
     if (!socket || !socket.connected) {
       // If no socket connection, redirect to landing
       console.log("No socket connection, redirecting to landing");
+      setStatus("landing");
+      navigate("/");
+      return;
+    }
+
+    // If not in waiting status, redirect
+    if (status !== "waiting") {
       navigate("/");
       return;
     }
@@ -30,13 +38,18 @@ const Waiting = () => {
 
     const handleRoomJoined = (data: RoomJoinedData) => {
       console.log("Room joined:", data);
-      setRoomData(data);
-      setWaiting(false);
+
+      // Determine player index based on socket ID
+      const socket = getSocket();
+      const playerIndex = socket?.id === data.player1Id ? 1 : 2;
+
+      joinRoom(data.roomId, playerIndex);
       navigate("/game");
     };
 
     const handlePlayerDisconnected = () => {
       alert("Other player disconnected. Returning to main menu.");
+      setStatus("landing");
       navigate("/");
     };
 
@@ -57,9 +70,9 @@ const Waiting = () => {
       listenersSetRef.current = false;
       console.log("Waiting page: Socket listeners cleaned up");
     };
-  }, [navigate, getSocket, setRoomData, setWaiting]);
+  }, [navigate, getSocket, joinRoom, setStatus, status]);
 
-  if (!isWaiting) {
+  if (status !== "waiting") {
     return null; // Will redirect
   }
 

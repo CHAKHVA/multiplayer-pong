@@ -6,23 +6,25 @@ import { useGameStore } from "../store/gameStore";
 const Landing = () => {
   const navigate = useNavigate();
   const { connect } = useSocket();
-  const { setConnected, setWaiting } = useGameStore();
+  const { setStatus, reset } = useGameStore();
   const [isConnecting, setIsConnecting] = useState(false);
 
   const handleJoinGame = () => {
     if (isConnecting) return;
+
+    // Reset any previous game state
+    reset();
 
     setIsConnecting(true);
     const socket = connect();
 
     const handleConnect = () => {
       console.log("Connected to server");
-      setConnected(true);
       setIsConnecting(false);
 
       // Join the game
       socket.emit("joinGame");
-      setWaiting(true);
+      setStatus("waiting");
 
       // Navigate to waiting screen
       navigate("/waiting");

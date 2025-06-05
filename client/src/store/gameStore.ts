@@ -1,34 +1,93 @@
 import { create } from "zustand";
-import type { GameState, RoomJoinedData } from "../types";
+import type { GameState } from "../types";
+
+type GameStatus = "landing" | "waiting" | "playing" | "gameOver";
 
 interface GameStore {
+  // State
   gameState: GameState | null;
-  roomData: RoomJoinedData | null;
-  isConnected: boolean;
-  isWaiting: boolean;
+  playerIndex: 1 | 2 | null;
+  roomId: string | null;
+  status: GameStatus;
 
+  // Actions
   setGameState: (state: GameState) => void;
-  setRoomData: (data: RoomJoinedData) => void;
-  setConnected: (connected: boolean) => void;
-  setWaiting: (waiting: boolean) => void;
+  setPlayerIndex: (index: 1 | 2 | null) => void;
+  setRoomId: (id: string | null) => void;
+  setStatus: (status: GameStatus) => void;
+
+  // Compound actions
+  joinRoom: (roomId: string, playerIndex: 1 | 2) => void;
+  startGame: (gameState: GameState) => void;
+  endGame: (winner: "player1" | "player2") => void;
   reset: () => void;
 }
 
-export const useGameStore = create<GameStore>((set) => ({
+export const useGameStore = create<GameStore>((set, get) => ({
+  // Initial state
   gameState: null,
-  roomData: null,
-  isConnected: false,
-  isWaiting: false,
+  playerIndex: null,
+  roomId: null,
+  status: "landing",
 
-  setGameState: (state) => set({ gameState: state }),
-  setRoomData: (data) => set({ roomData: data }),
-  setConnected: (connected) => set({ isConnected: connected }),
-  setWaiting: (waiting) => set({ isWaiting: waiting }),
+  // Basic setters
+  setGameState: (gameState) => set({ gameState }),
+
+  setPlayerIndex: (playerIndex) => set({ playerIndex }),
+
+  setRoomId: (roomId) => set({ roomId }),
+
+  setStatus: (status) => set({ status }),
+
+  // Compound actions
+  joinRoom: (roomId, playerIndex) =>
+    set({
+      roomId,
+      playerIndex,
+      status: "playing",
+    }),
+
+  startGame: (gameState) =>
+    set({
+      gameState,
+      status: "playing",
+    }),
+
+  endGame: (winner) =>
+    set((state) => ({
+      gameState: state.gameState
+        ? {
+            ...state.gameState,
+            gameOver: true,
+            winner,
+          }
+        : null,
+      status: "gameOver",
+    })),
+
   reset: () =>
     set({
       gameState: null,
-      roomData: null,
-      isConnected: false,
-      isWaiting: false,
+      playerIndex: null,
+      roomId: null,
+      status: "landing",
     }),
 }));
+
+// Selectors for convenience
+export const useGameStatus = () => useGameStore((state) => state.status);
+export const usePlayerIndex = () => useGameStore((state) => state.playerIndex);
+export const useRoomId = () => useGameStore((state) => state.roomId);
+export const useCurrentGameState = () =>
+  useGameStore((state) => state.gameState);
+
+// Derived state selectors
+export const useIsPlayer1 = () =>
+  useGameStore((state) => state.playerIndex === 1);
+export const useIsPlayer2 = () =>
+  useGameStore((state) => state.playerIndex === 2);
+export const useIsGameOver = () =>
+  useGameStore((state) => state.gameState?.gameOver ?? false);
+export const useCurrentScore = () =>
+  useGameStore((state) => state.gameState?.score ?? { player1: 0, player2: 0 });
+export const useWinner = () => useGameStore((state) => state.gameState?.winner);
