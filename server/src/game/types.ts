@@ -24,3 +24,7 @@ export interface Player {
   id: string;
   playerIndex: 1 | 2;
 }
+
+export interface PaddleMoveEvent {
+  dir: "up" | "down";
+}
