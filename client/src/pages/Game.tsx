@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import GameCanvas from "../components/GameCanvas";
-import { useKeyboardControls } from "../hooks/useKeyboardControl";
+import { useKeyboardControls } from "../hooks/useKeyboardControls"; // Using the hook
 import { useSocket } from "../hooks/useSocket";
 import {
   useCurrentGameState,
@@ -19,77 +19,61 @@ const Game = () => {
   const roomId = useRoomId();
   const status = useGameStatus();
   const gameState = useCurrentGameState();
-  const { setStatus, setGameState, endGame } = useGameStore();
+  const { setStatus, setGameState, endGame, reset } = useGameStore();
   const listenersSetRef = useRef(false);
-  const keyboardListenerSetRef = useRef(false);
 
-  // Throttling refs
-  const lastEmitTimeRef = useRef(0);
-  const EMIT_THROTTLE_MS = 1000 / 60; // 60 Hz = ~16.67ms
+  // Use the keyboard controls hook
+  useKeyboardControls({
+    socket: getSocket(),
+    playerIndex,
+    enabled: status === "playing" && !gameState?.gameOver,
+  });
 
   useEffect(() => {
-    // Redirect if not in playing status
-    if (status !== "playing") {
-      setStatus("landing");
-      navigate("/");
-      return;
-    }
-
     const socket = getSocket();
     if (!socket || !socket.connected) {
-      setStatus("landing");
+      reset();
       navigate("/");
       return;
     }
 
-    // Prevent duplicate listeners
+    if (status !== "playing" && status !== "gameOver") {
+      navigate("/");
+      return;
+    }
+
     if (listenersSetRef.current) return;
     listenersSetRef.current = true;
 
+    // This is the core logic for this prompt
     const handleGameState = (state: GameState) => {
+      // Update the store with the new state from the server
       setGameState(state);
     };
 
-    const handleGameOver = (data: {
-      winner: "player1" | "player2";
-      finalScore: any;
-    }) => {
+    const handleGameOver = (data: { winner: "player1" | "player2" }) => {
       endGame(data.winner);
     };
 
     const handlePlayerDisconnected = () => {
       alert("Other player disconnected. Game ended.");
-      setStatus("landing");
+      reset();
       navigate("/");
     };
 
-    // Set up event listeners
     socket.on("gameState", handleGameState);
     socket.on("gameOver", handleGameOver);
     socket.on("playerDisconnected", handlePlayerDisconnected);
 
-    console.log("Game page: Socket listeners set up");
-
-    // Cleanup function
     return () => {
-      if (socket) {
-        socket.off("gameState", handleGameState);
-        socket.off("gameOver", handleGameOver);
-        socket.off("playerDisconnected", handlePlayerDisconnected);
-      }
+      socket.off("gameState", handleGameState);
+      socket.off("gameOver", handleGameOver);
+      socket.off("playerDisconnected", handlePlayerDisconnected);
       listenersSetRef.current = false;
-      console.log("Game page: Socket listeners cleaned up");
     };
-  }, [status, navigate, setStatus, getSocket, setGameState, endGame]);
+  }, [status, navigate, getSocket, setGameState, endGame, reset]);
 
-  // Keyboard input handling
-  useKeyboardControls({
-    socket: getSocket(),
-    playerIndex,
-    enabled: status === "playing",
-  });
-
-  if (status !== "playing") {
+  if (status !== "playing" && status !== "gameOver") {
     return null;
   }
 
@@ -117,11 +101,6 @@ const Game = () => {
         <p style={{ margin: "0", color: "#ccc" }}>
           You are Player {playerIndex} | Room: {roomId}
         </p>
-        {gameState && (
-          <p style={{ margin: "5px 0 0 0", fontSize: "14px", color: "#888" }}>
-            Score: {gameState.score.player1} - {gameState.score.player2}
-          </p>
-        )}
       </div>
 
       <GameCanvas width={800} height={600} />
@@ -138,9 +117,6 @@ const Game = () => {
           {playerIndex === 1
             ? "Your controls: W (up) / S (down)"
             : "Your controls: ↑ (up) / ↓ (down)"}
-        </p>
-        <p style={{ marginTop: "5px", fontSize: "12px" }}>
-          {playerIndex === 1 ? "Opponent: ↑ / ↓" : "Opponent: W / S"}
         </p>
       </div>
     </div>
